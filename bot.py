@@ -72,11 +72,11 @@ def broadcast(update: Update, context: CallbackContext) -> None:
             logger.error(f'Error sending message to user {member_id}: {e}')
 
 def join_channel(update: Update, context: CallbackContext) -> None:
-"""Send a message with a button that allows the user to join the Telegram channel."""
-user = update.message.from_user
-keyboard = [[InlineKeyboardButton("Join our Telegram channel", url=JOIN_BUTTON_LINK)]]
-reply_markup = InlineKeyboardMarkup(keyboard)
-update.message.reply_text(f'Hi {user.first_name}, please join our Telegram channel.', reply_markup=reply_markup)
+    """Send a message with a button that allows the user to join the Telegram channel."""
+    user = update.message.from_user
+    keyboard = [[InlineKeyboardButton("Join our Telegram channel", url=JOIN_BUTTON_LINK)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(f'Hi {user.first_name}, please join our Telegram channel.', reply_markup=reply_markup)
 
 def main() -> None:
 """Start the bot."""
