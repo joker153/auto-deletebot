@@ -1,0 +1,32 @@
+{
+  "name": "auto-deletebot",
+  "description": "A Telegram bot for deleting messages in a group/channel",
+  "repository": "https://github.com/joker153/auto-deletebot.git",
+  "keywords": ["telegram", "bot", "auto-delete"],
+  "image": "heroku/python",
+  "addons": [
+    "heroku-postgresql"
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "stack": "heroku-20",
+  "config": {
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token"
+    },
+    "CHANNEL_ID": {
+      "description": "Telegram Channel ID"
+    },
+    "JOIN_BUTTON_LINK": {
+      "description": "Link to Join Button"
+    }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1
+    }
+  }
+}
