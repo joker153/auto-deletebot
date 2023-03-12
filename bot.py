@@ -1,9 +1,9 @@
 import logging
 import os
-import time
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, Update
-from telegram.ext import CallbackContext, CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext import (CallbackContext, CommandHandler, Filters, JobQueue,
+                          MessageHandler, Updater)
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-CHANNEL_ID = os.environ.get('CHANNEL_ID')
-JOIN_BUTTON_LINK = os.environ.get('JOIN_BUTTON_LINK')
+API_ID = os.environ.get('API_ID')
+API_HASH = os.environ.get('API_HASH')
+ADMINS = list(map(int, os.environ.get('ADMINS', '').split()))
 
 # Define message deletion time
 DEFAULT_DELETION_TIME = 300  # 5 minutes
@@ -48,6 +49,9 @@ def delete_callback(context: CallbackContext) -> None:
 def get_users(update: Update, context: CallbackContext) -> None:
     """Get the list of users in the chat."""
     chat_id = update.message.chat_id
+    if update.message.from_user.id not in ADMINS:
+        update.message.reply_text('This command is only available to admins.')
+        return
     members = [member.user for member in context.bot.get_chat(chat_id).get_members()]
     user_details = [f'{user.first_name} ({user.id})' for user in members]
     message = '\n'.join(user_details)
@@ -55,50 +59,49 @@ def get_users(update: Update, context: CallbackContext) -> None:
 
 def broadcast(update: Update, context: CallbackContext) -> None:
     """Broadcast a message to the chat."""
+    if update.message.from_user.id not in ADMINS:
+        update.message.reply_text('This command is only available to admins.')
+        return
     message = update.message.text[10:]
-    members = [member.user.id for member in context.bot.get_chat(CHANNEL_ID).get_members()]
-    context.bot.send_message(chat_id=CHANNEL_ID, text=message)
+    members = [member.user.id for member in context.bot.get_chat(chat_id).get_members()]
+    context.bot.send_message(chat_id=chat_id, text=message)
     for member_id in members:
         try:
             context.bot.send_message(chat_id=member_id, text=message)
         except Exception as e:
             logger.error(f'Error sending message to user {member_id}: {e}')
 
-def subscribe(update: Update, context: CallbackContext) -> None:
-    """Force subscription to the channel."""
-    user_id = update.message.from_user.id
-    try:
-        context.bot.send_message(chat_id=user_id, text=f'Please join the channel {JOIN_BUTTON_LINK}')
-        keyboard = [[InlineKeyboardButton("Join Channel", url=JOIN_BUTTON_LINK)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(chat_id=user_id, text='Please click the button below to join the channel:', reply_markup=reply_markup)
-    except Exception as e:
-        logger.error(f'Error sending subscription message to user {user_id}: {e}')
+def join_channel(update: Update, context: CallbackContext) -> None:
+"""Send a message with a button that allows the user to join the Telegram channel."""
+user = update.message.from_user
+keyboard = [[InlineKeyboardButton("Join our Telegram channel", url=JOIN_BUTTON_LINK)]]
+reply_markup = InlineKeyboardMarkup(keyboard)
+update.message.reply_text(f'Hi {user.first_name}, please join our Telegram channel.', reply_markup=reply_markup)
 
 def main() -> None:
-    """Run the bot."""
-    # Create an updater and set the bot token
-    updater = Updater(BOT_TOKEN)
+"""Start the bot."""
+# Create the Updater and pass it the bot's token.
+updater = Updater(BOT_TOKEN)
 
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
+# Get the dispatcher to register handlers.
+dispatcher = updater.dispatcher
 
-    # Register command handlers
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(CommandHandler('settime', set_deletion_time))
-    dispatcher.add_handler(CommandHandler('getusers', get_users))
-    dispatcher.add_handler(CommandHandler('broadcast', broadcast, filters=Filters.chat(CHANNEL_ID)))
-    dispatcher.add_handler(CommandHandler('subscribe', subscribe))
+# Add command handlers.
+dispatcher.add_handler(CommandHandler('start', start))
+dispatcher.add_handler(CommandHandler('setdeletiontime', set_deletion_time))
+dispatcher.add_handler(CommandHandler('getusers', get_users))
+dispatcher.add_handler(CommandHandler('broadcast', broadcast))
 
-    # Register message handlers
-    dispatcher.add_handler(MessageHandler(Filters.text, delete_message))
+# Add message handler to delete messages.
+dispatcher.add_handler(MessageHandler(Filters.all, delete_message))
 
-    # Start the bot
-    updater.start_polling()
-    logger.info('Bot started!')
+# Add join channel handler.
+dispatcher.add_handler(CommandHandler('joinchannel', join_channel))
 
-    # Run the bot until the user presses Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT
-    updater.idle()
+# Start the bot.
+updater.start_polling()
 
-if __name__ == '__main__':
-    main()
+# Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
+updater.idle()
+
+main()
