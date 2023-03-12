@@ -2,7 +2,7 @@ import logging
 import os
 
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, Update
-from pyrogram.typesimport (CallbackContext, CommandHandler, Filters, JobQueue,
+from pyrogram.types import (CallbackContext, CommandHandler, Filters, JobQueue,
                           MessageHandler, Updater)
 
 # Set up logging
