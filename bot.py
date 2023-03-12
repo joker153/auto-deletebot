@@ -1,61 +1,59 @@
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import os
 import time
-from pyrogram import Client, filters
 
-app = Client(
-    "my_bot",
-    api_id=os.environ.get("API_ID"),
-    api_hash=os.environ.get("API_HASH"),
-    bot_token=os.environ.get("BOT_TOKEN")
-)
+# Your API ID and API hash
+API_ID = int(os.environ.get("API_ID", ""))
+API_HASH = os.environ.get("API_HASH", "")
 
-# Define the source groups and destination channel IDs
-source_group_ids = [-123456789, -987654321]  # Replace with the source group IDs
-destination_channel_id = "@my_channel"  # Replace with the destination channel ID
+# Your Bot Token
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
-# Define the time interval (in seconds) for copying the members
-copy_interval = 60 * 60  # Copy members every hour
+# ID of the authorized channel
+AUTH_CHANNEL = int(os.environ.get("AUTH_CHANNEL", ""))
 
-# Define the function to join the source groups and copy all members to the destination channel
-def copy_all_members():
-    for group_id in source_group_ids:
-        try:
-            # Join the group
-            app.join_chat(group_id)
-            print(f"Joined {group_id}")
+# Create a Pyrogram client instance
+app = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-            # Get all members of the group
-            members = app.get_chat_members(group_id)
+# Function to check if user is authorized to use the bot
+def is_authorized(chat_id):
+    try:
+        member = app.get_chat_member(chat_id=AUTH_CHANNEL, user_id=chat_id)
+        if member.status == 'member' or member.status == 'creator' or member.status == 'administrator':
+            return True
+        else:
+            return False
+    except Exception as e:
+        return False
 
-            # Add each member to the destination channel
-            for member in members:
-                if member.user.is_bot:
-                    continue  # Skip bots
-                app.add_chat_members(chat_id=destination_channel_id, user_ids=member.user.id)
-                print(f"Copied {member.user.first_name} from {group_id} to {destination_channel_id}")
-        except Exception as e:
-            print(f"Failed to copy members from {group_id}: {e}")
+# Function to delete messages
+def delete_message(client, message):
+    if message.chat.type != 'private' and is_authorized(message.chat.id):
+        message.delete()
 
-# Define the function to run the copying process at a specified time interval
-def run_copy_process():
-    while True:
-        copy_all_members()
-        time.sleep(copy_interval)
+# Command to start the bot
+@app.on_message(filters.command("start"))
+def start(client, message):
+    # Check if user is authorized
+    if not is_authorized(message.chat.id):
+        message.reply_text("You are not authorized to use this bot. Please join the authorized channel first.")
+        return
+    # Send a message with instructions
+    message.reply_text("Add me to a group and give me permission to delete messages. I will automatically delete all messages in the group after 5 minutes.")
 
-# Start the bot and run the copying process at a specified time interval
-with app:
-    app.send_message(
-        chat_id=app.get_me().id, 
-        text="Please subscribe to our channel to use this bot.",
-        disable_notification=True
-    )
-    @app.on_message(filters.command("start") & filters.private)
-    def start(bot, update):
-        bot.send_message(
-            chat_id=update.chat.id,
-            text="Please subscribe to our channel to use this bot.",
-            disable_notification=True
-        )
-    app.join_chat(destination_channel_id)
-    run_copy_process()
-    app.idle()
+# Handler to delete messages
+@app.on_message(filters.group & ~filters.edited)
+def delete_messages(client, message):
+    if message.chat.type != 'private' and is_authorized(message.chat.id):
+        # Schedule message deletion after 5 minutes
+        client.scheduler.schedule(300, delete_message, message=message)
+
+# Custom delete button in PM settings
+@app.on_callback_query()
+def custom_delete_button(client, callback_query):
+    if callback_query.data == "delete":
+        callback_query.message.delete()
+
+# Start the bot
+app.run()
