@@ -79,9 +79,10 @@ def join_channel(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(f'Hi {user.first_name}, please join our Telegram channel.', reply_markup=reply_markup)
 
 def main() -> None:
-"""Start the bot."""
-# Create the Updater and pass it the bot's token.
-updater = Updater(BOT_TOKEN)
+    """Start the bot."""
+    # Create the Updater and pass it the bot's token.
+    updater = Updater(BOT_TOKEN)
+    ...
 
 # Get the dispatcher to register handlers.
 dispatcher = updater.dispatcher
