@@ -62,6 +62,7 @@ def broadcast(update: Update, context: CallbackContext) -> None:
     if update.message.from_user.id not in ADMINS:
         update.message.reply_text('This command is only available to admins.')
         return
+    chat_id = update.message.chat_id
     message = update.message.text[10:]
     members = [member.user.id for member in context.bot.get_chat(chat_id).get_members()]
     context.bot.send_message(chat_id=chat_id, text=message)
@@ -81,8 +82,32 @@ def join_channel(update: Update, context: CallbackContext) -> None:
 def main() -> None:
     """Start the bot."""
     # Create the Updater and pass it the bot's token.
-    updater = Updater(BOT_TOKEN)
-    ...
+    updater = Updater(BOT_TOKEN, use_context=True)
+
+    # Get the dispatcher to register handlers.
+    dispatcher = updater.dispatcher
+
+    # Add command handlers.
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CommandHandler('setdeletiontime', set_deletion_time))
+    dispatcher.add_handler(CommandHandler('getusers', get_users))
+    dispatcher.add_handler(CommandHandler('broadcast', broadcast))
+
+    # Add message handler to delete messages.
+    dispatcher.add_handler(MessageHandler(Filters.all, delete_message))
+
+    # Add join channel handler.
+    dispatcher.add_handler(CommandHandler('joinchannel', join_channel))
+
+    # Start the JobQueue.
+    job_queue = updater.job_queue
+
+    # Start the bot.
+    updater.start_polling()
+
+    # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
+    updater.idle()
+
 
 # Get the dispatcher to register handlers.
 dispatcher = updater.dispatcher
