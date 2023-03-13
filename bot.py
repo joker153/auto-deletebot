@@ -11,7 +11,7 @@ bot_token = os.environ.get("BOT_TOKEN")
 
 # Bot configuration
 auth_channel = int(os.environ.get("AUTH_CHANNEL"))
-delete_time = 300  # seconds (5 minutes)
+default_delete_time = 300  # seconds (5 minutes)
 
 # Create a new Pyrogram Client instance
 app = Client(
@@ -76,6 +76,17 @@ def handle_callback(client: Client, callback_query: Message):
         # Answer the callback query
         callback_query.answer("Message deleted successfully!")
 
+    # Handle custom deletion time settings
+    elif "delete_time" in callback_query.data:
+        # Get the new deletion time from the callback data
+        delete_time = int(callback_query.data.split("_")[1])
+
+        # Store the new deletion time for the user
+        client.db.set(f"delete_time_{callback_query.from_user.id}", delete_time)
+
+        # Answer the callback query
+        callback_query.answer(f"Message deletion time set to {delete_time} seconds.")
+
 # Start the bot
 app.start()
 
@@ -83,12 +94,10 @@ app.start()
 while True:
     now = time.time()
     for message_info in app._message_infos:
+        delete_time = app.db.get(f"delete_time_{message_info['chat_id']}")
+        if delete_time is None:
+            delete_time = default_delete_time
+
         if now - message_info["timestamp"] > delete_time:
             # Delete the message
-            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
-
-            # Remove the message info from the list
-            app._message_infos.remove(message_info)
-
-    # Wait for a minute before checking again
-    time.sleep(60)
+            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info
