@@ -4,88 +4,88 @@ import pyrogram
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-# Telegram API configuration
-api_id = int(os.environ.get("API_ID"))
-api_hash = os.environ.get("API_HASH")
-bot_token = os.environ.get("BOT_TOKEN")
+# TELEGRAM API CONFIGURATION
+API_ID = int(os.environ.get("API_ID"))
+API_HASH = os.environ.get("API_HASH")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-# Bot configuration
-auth_channel = int(os.environ.get("AUTH_CHANNEL"))
-delete_time = 300  # seconds (5 minutes)
+# BOT CONFIGURATION
+AUTH_CHANNEL = int(os.environ.get("AUTH_CHANNEL"))
+DELETE_TIME = 300  # seconds (5 minutes)
 
-# Create a new Pyrogram Client instance
+# CREATE A NEW PYROGRAM CLIENT INSTANCE
 app = Client(
     "my_bot",
-    api_id=api_id,
-    api_hash=api_hash,
-    bot_token=bot_token
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
 )
 
-# Handle the "/start" command
+# HANDLE THE "/start" COMMAND
 @app.on_message(filters.command("start"))
 def start_command(client: Client, message: Message):
-    # Send a welcome message
+    # SEND A WELCOME MESSAGE
     message.reply_text("Hello! Please add me to a group so I can delete messages there.")
 
-# Handle messages in a group chat
+# HANDLE MESSAGES IN A GROUP CHAT
 @app.on_message(filters.group & ~filters.edited)
 def group_message(client: Client, message: Message):
-    if message.chat.id == auth_channel:
-        # Save the message ID and timestamp for future use
+    if message.chat.id == AUTH_CHANNEL:
+        # SAVE THE MESSAGE ID AND TIMESTAMP FOR FUTURE USE
         message_info = {
             "chat_id": message.chat.id,
             "message_id": message.message_id,
             "timestamp": time.time()
         }
 
-        # Store the message info in a list
+        # STORE THE MESSAGE INFO IN A LIST
         client._message_infos = client._message_infos[:10] + [message_info]
 
-        # Add a custom "Delete" button to the message
+        # ADD A CUSTOM "DELETE" BUTTON TO THE MESSAGE
         button = InlineKeyboardButton(
             text="Delete",
             callback_data=f"delete_{message.chat.id}_{message.message_id}"
         )
         markup = InlineKeyboardMarkup([[button]])
 
-        # Send the message with the custom button
+        # SEND THE MESSAGE WITH THE CUSTOM BUTTON
         client.send_message(
             chat_id=message.chat.id,
             text=message.text,
             reply_markup=markup
         )
 
-# Handle button clicks
+# HANDLE BUTTON CLICKS
 @app.on_callback_query()
 def handle_callback(client: Client, callback_query: Message):
     if "delete" in callback_query.data:
-        # Get the chat ID and message ID from the callback data
+        # GET THE CHAT ID AND MESSAGE ID FROM THE CALLBACK DATA
         chat_id, message_id = map(int, callback_query.data.split("_")[1:3])
 
-        # Check if the user is authorized to delete messages
-        if callback_query.from_user.id != auth_channel:
+        # CHECK IF THE USER IS AUTHORIZED TO DELETE MESSAGES
+        if callback_query.from_user.id != AUTH_CHANNEL:
             callback_query.answer("You are not authorized to perform this action!")
             return
 
-        # Delete the message
+        # DELETE THE MESSAGE
         client.delete_messages(chat_id=chat_id, message_ids=message_id)
 
-        # Answer the callback query
+        # ANSWER THE CALLBACK QUERY
         callback_query.answer("Message deleted successfully!")
 
-# Start the bot
+# START THE BOT
 app.start()
 
-# Periodically delete old messages
+# PERIODICALLY DELETE OLD MESSAGES
 while True:
     now = time.time()
     for message_info in app._message_infos:
-        if now - message_info["timestamp"] > delete_time:
-            # Delete the message
+        if now - message_info["timestamp"] > DELETE_TIME:
+            # DELETE THE MESSAGE
             app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
 
-            # Remove the message info from the list
+            # REMOVE THE MESSAGE INFO FROM THE LIST
             app._message_infos.remove(message_info)
 
-    # Wait for a minute before checking again
+    # WAIT FOR A MINUTE BEFORE CHECKING AGAIN
     time.sleep(60)
