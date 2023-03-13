@@ -73,17 +73,15 @@ def handle_callback(client: Client, callback_query: Message):
         # Answer the callback query
         callback_query.answer("Message deleted successfully!")
 
-# Delete old messages periodically
-@app.on_timer(60)
-def delete_old_messages(client: Client):
+# Start the bot and run the loop
+app.start()
+while True:
     now = time.time()
-    for message_info in client._message_infos:
+    for message_info in app._message_infos:
         if now - message_info["timestamp"] > delete_time:
             # Delete the message
-            client.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
+            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
 
             # Remove the message info from the list
-            client._message_infos.remove(message_info)
-
-# Start the bot
-app.run()
+            app._message_infos.remove(message_info)
+    time.sleep(60)  # Wait for 60 seconds before executing the function again
