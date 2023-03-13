@@ -21,6 +21,9 @@ app = Client(
     bot_token=bot_token
 )
 
+# Initialize the message info list
+app._message_infos = []
+
 # Handle the "/start" command
 @app.on_message(filters.command("start"))
 def start_command(client: Client, message: Message):
@@ -73,15 +76,17 @@ def handle_callback(client: Client, callback_query: Message):
         # Answer the callback query
         callback_query.answer("Message deleted successfully!")
 
-# Start the bot and run the loop
-app.start()
-while True:
+# Delete old messages periodically
+@app.on_timer(60)
+def delete_old_messages(client: Client):
     now = time.time()
     for message_info in app._message_infos:
         if now - message_info["timestamp"] > delete_time:
             # Delete the message
-            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
+            client.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
 
             # Remove the message info from the list
             app._message_infos.remove(message_info)
-    time.sleep(60)  # Wait for 60 seconds before executing the function again
+
+# Start the bot
+app.run()
