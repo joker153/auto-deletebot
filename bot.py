@@ -12,6 +12,7 @@ bot_token = os.environ.get("BOT_TOKEN")
 # Bot configuration
 auth_channel = int(os.environ.get("AUTH_CHANNEL"))
 default_delete_time = 300  # seconds (5 minutes)
+max_delete_time = 3600  # seconds (1 hour)
 
 # Create a new Pyrogram Client instance
 app = Client(
@@ -28,7 +29,49 @@ app._message_infos = []
 @app.on_message(filters.command("start"))
 def start_command(client: Client, message: Message):
     # Send a welcome message
-    message.reply_text("Hello! Please add me to a group so I can delete messages there.")
+    user_mention = message.from_user.mention if message.from_user.username else message.from_user.first_name
+    message.reply_text(f"Hello {user_mention}! Please add me to a group so I can delete messages there.")
+
+# Handle the settings command in a private chat
+@app.on_message(filters.private & filters.command("settings"))
+def settings_command(client: Client, message: Message):
+    # Send a message with the current deletion time and the "Change" button
+    text = f"The current deletion time is {delete_time} seconds."
+    button = InlineKeyboardButton(text="Change", callback_data="change_delete_time")
+    markup = InlineKeyboardMarkup([[button]])
+    message.reply_text(text, reply_markup=markup)
+
+# Handle button clicks
+@app.on_callback_query()
+def handle_callback(client: Client, callback_query: Message):
+    if "delete" in callback_query.data:
+        # Get the chat ID and message ID from the callback data
+        chat_id, message_id = map(int, callback_query.data.split("_")[1:3])
+
+        # Check if the user is authorized to delete messages
+        if callback_query.from_user.id != auth_channel:
+            callback_query.answer("You are not authorized to perform this action!")
+            return
+
+        # Delete the message
+        client.delete_messages(chat_id=chat_id, message_ids=message_id)
+
+        # Answer the callback query
+        callback_query.answer("Message deleted successfully!")
+
+    elif callback_query.data == "change_delete_time":
+        # Send a message asking for the new deletion time
+        callback_query.answer()
+        text = "Enter the new deletion time in seconds (must be between 30 and 300):"
+        client.send_message(chat_id=callback_query.from_user.id, text=text)
+
+        # Save the message ID and timestamp for future use
+        message_info = {
+            "chat_id": callback_query.from_user.id,
+            "message_id": callback_query.message.message_id,
+            "timestamp": time.time()
+        }
+        client._message_infos = client._message_infos[:10] + [message_info]
 
 # Handle messages in a group chat
 @app.on_message(filters.group & ~filters.edited)
@@ -58,35 +101,6 @@ def group_message(client: Client, message: Message):
             reply_markup=markup
         )
 
-# Handle button clicks
-@app.on_callback_query()
-def handle_callback(client: Client, callback_query: Message):
-    if "delete" in callback_query.data:
-        # Get the chat ID and message ID from the callback data
-        chat_id, message_id = map(int, callback_query.data.split("_")[1:3])
-
-        # Check if the user is authorized to delete messages
-        if callback_query.from_user.id != auth_channel:
-            callback_query.answer("You are not authorized to perform this action!")
-            return
-
-        # Delete the message
-        client.delete_messages(chat_id=chat_id, message_ids=message_id)
-
-        # Answer the callback query
-        callback_query.answer("Message deleted successfully!")
-
-    # Handle custom deletion time settings
-    elif "delete_time" in callback_query.data:
-        # Get the new deletion time from the callback data
-        delete_time = int(callback_query.data.split("_")[1])
-
-        # Store the new deletion time for the user
-        client.db.set(f"delete_time_{callback_query.from_user.id}", delete_time)
-
-        # Answer the callback query
-        callback_query.answer(f"Message deletion time set to {delete_time} seconds.")
-
 # Start the bot
 app.start()
 
@@ -94,10 +108,12 @@ app.start()
 while True:
     now = time.time()
     for message_info in app._message_infos:
-        delete_time = app.db.get(f"delete_time_{message_info['chat_id']}")
-        if delete_time is None:
-            delete_time = default_delete_time
-
         if now - message_info["timestamp"] > delete_time:
             # Delete the message
-            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info
+            app.delete_messages(chat_id=message_info["chat_id"], message_ids=message_info["message_id"])
+
+            # Remove the message info from the list
+            app._message_infos.remove(message_info)
+
+    # Wait for a minute before checking again
+    time.sleep(60)
